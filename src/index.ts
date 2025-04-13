@@ -1,60 +1,48 @@
-import express, { ErrorRequestHandler } from 'express';
+import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
 import dotenv from 'dotenv';
+import { logger } from './utils/logger';
+
+// Import routes
 import authRoutes from './routes/auth.routes';
-import { AppError } from './utils/errors';
+import employeeRoutes from './routes/employee.routes';
 
 // Load environment variables
 dotenv.config();
 
-// Create Express app
 const app = express();
 
 // Middleware
-app.use(express.json());
 app.use(cors());
-app.use(helmet());
-app.use(morgan('dev'));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/employees', employeeRoutes);
 
 // Error handling middleware
-const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
-  console.error(err.stack);
-
-  if (err instanceof AppError) {
-    res.status(err.statusCode).json({
-      status: 'error',
-      message: err.message,
-    });
-    return;
-  }
-
-  res.status(500).json({
-    status: 'error',
-    message: 'Internal server error',
-  });
-};
-
-app.use(errorHandler);
-
-// Database connection
-mongoose
-  .connect(process.env.MONGODB_URI!)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch((error) => console.error('MongoDB connection error:', error));
-
-// Basic route
-app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to Shashi HRM API' });
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error('Unhandled error:', err);
+  res.status(500).json({ message: 'Internal server error' });
 });
+
+// Connect to MongoDB
+const connectDB = async () => {
+  try {
+    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/shashi-hrm';
+    await mongoose.connect(mongoURI);
+    logger.info('MongoDB connected successfully');
+  } catch (error) {
+    logger.error('MongoDB connection error:', error);
+    process.exit(1);
+  }
+};
 
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  logger.info(`Server running on port ${PORT}`);
+  connectDB();
 }); 

@@ -1,88 +1,57 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response } from 'express';
 import { AuthService } from '../services/auth.service';
-import { BadRequestError } from '../utils/errors';
+import { handleError } from '../utils/errors';
+import { IUser } from '../models/User';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 export class AuthController {
-  static async register(req: Request, res: Response, next: NextFunction) {
+  static async register(req: AuthenticatedRequest, res: Response) {
     try {
-      const { email, password, firstName, lastName, role, department } = req.body;
-
-      // Validate required fields
-      if (!email || !password || !firstName || !lastName || !department) {
-        throw new BadRequestError('All fields are required');
-      }
-
-      const user = await AuthService.register({
-        email,
-        password,
-        firstName,
-        lastName,
-        role,
-        department,
-      });
-
+      const result = await AuthService.register(req.body);
       res.status(201).json({
-        message: 'User registered successfully',
-        user: {
-          id: user._id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          department: user.department,
-        },
+        message: 'Registration successful',
+        user: result.user,
+        token: result.token,
       });
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   }
 
-  static async login(req: Request, res: Response, next: NextFunction) {
+  static async login(req: AuthenticatedRequest, res: Response) {
     try {
       const { email, password } = req.body;
-
-      if (!email || !password) {
-        throw new BadRequestError('Email and password are required');
-      }
-
-      const { user, token } = await AuthService.login(email, password);
+      const result = await AuthService.login(email, password);
+      
+      const userData = {
+        id: result.user._id,
+        email: result.user.email,
+        firstName: result.user.firstName,
+        lastName: result.user.lastName,
+        role: result.user.role,
+        department: result.user.department,
+      };
 
       res.json({
         message: 'Login successful',
-        user: {
-          id: user._id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          department: user.department,
-        },
-        token,
+        user: userData,
+        token: result.token,
       });
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   }
 
-  static async getCurrentUser(req: Request, res: Response, next: NextFunction) {
+  static async getCurrentUser(req: AuthenticatedRequest, res: Response) {
     try {
-      const user = req.user;
+      console.log("===================>",req.user);
+      const user = await AuthService.getCurrentUser(req.user?._id);
       if (!user) {
-        throw new BadRequestError('User not found');
+        return res.status(404).json({ message: 'User not found' });
       }
-
-      res.json({
-        user: {
-          id: user._id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          department: user.department,
-        },
-      });
+      res.json(user);
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   }
 } 
