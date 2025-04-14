@@ -7,6 +7,8 @@ import { logger } from './utils/logger';
 // Import routes
 import authRoutes from './routes/auth.routes';
 import employeeRoutes from './routes/employee.routes';
+import attendanceRoutes from './routes/attendanceRoutes';
+import leaveRoutes from './routes/leaveRoutes';
 
 // Load environment variables
 dotenv.config();
@@ -21,6 +23,8 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/leaves', leaveRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

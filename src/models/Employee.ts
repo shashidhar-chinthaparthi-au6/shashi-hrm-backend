@@ -12,6 +12,7 @@ export interface IEmployee extends Document {
   joiningDate: Date;
   salary: number;
   status: 'active' | 'inactive' | 'on_leave';
+  userId: mongoose.Types.ObjectId;
   address: {
     street: string;
     city: string;
@@ -51,6 +52,7 @@ const EmployeeSchema = new Schema<IEmployee>(
       enum: ['active', 'inactive', 'on_leave'],
       default: 'active',
     },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     address: {
       street: { type: String, required: true },
       city: { type: String, required: true },
@@ -79,5 +81,6 @@ EmployeeSchema.index({ email: 1 });
 EmployeeSchema.index({ department: 1 });
 EmployeeSchema.index({ role: 1 });
 EmployeeSchema.index({ status: 1 });
+EmployeeSchema.index({ userId: 1 });
 
 export const Employee = mongoose.model<IEmployee>('Employee', EmployeeSchema); 

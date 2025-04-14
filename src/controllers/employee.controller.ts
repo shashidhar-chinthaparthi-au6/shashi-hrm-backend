@@ -1,8 +1,10 @@
 import { Response } from 'express';
 import { Employee, IEmployee } from '../models/Employee';
+import { User } from '../models/User';
 import { Role, rolePermissions } from '../types/roles';
 import { handleError } from '../utils/errors';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import bcrypt from 'bcryptjs';
 
 export class EmployeeController {
   // Get all employees (with role-based filtering)
@@ -61,13 +63,29 @@ export class EmployeeController {
         return res.status(403).json({ message: 'Access denied' });
       }
 
-      const employeeData = {
-        ...req.body,
+      const { email, password, ...employeeData } = req.body;
+
+      // Create user account
+      const hashedPassword = await bcrypt.hash(password || 'defaultPassword123', 10);
+      const user = new User({
+        firstName: employeeData.firstName,
+        lastName: employeeData.lastName,
+        email,
+        password: hashedPassword,
+        role: employeeData.role || Role.EMPLOYEE,
+        department: employeeData.department,
+        isActive: true,
+      });
+      await user.save();
+
+      // Create employee record with userId
+      const employee = new Employee({
+        ...employeeData,
+        email,
+        userId: user._id, // Set the userId field
         createdBy: req.user?._id,
         updatedBy: req.user?._id,
-      };
-
-      const employee = new Employee(employeeData);
+      });
       await employee.save();
 
       res.status(201).json(employee);
