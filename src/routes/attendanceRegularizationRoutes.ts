@@ -4,16 +4,17 @@ import {
   getRegularizationRequests,
   updateRegularizationStatus,
 } from '../controllers/attendanceRegularizationController';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authenticate } from '../middleware/auth';
 
 const router = express.Router();
 
-// Apply authentication middleware to all routes
-router.use(authMiddleware);
+// Apply for regularization (Employee)
+router.post('/', authenticate, applyForRegularization);
 
-// Regularization routes
-router.post('/', applyForRegularization);
-router.get('/', getRegularizationRequests);
-router.put('/:id/status', updateRegularizationStatus);
+// Get regularization requests (HR Manager)
+router.get('/', authenticate, getRegularizationRequests);
+
+// Update regularization status (HR Manager)
+router.put('/:id/status', authenticate, updateRegularizationStatus);
 
 export default router; 

@@ -10,7 +10,7 @@ export const applyForOvertime = async (req: Request, res: Response) => {
     const userId = req.user?._id;
 
     if (!userId) {
-      return res.status(400).json({ message: 'User ID is required' });
+      return res.status(401).json({ message: 'Unauthorized' });
     }
 
     // Find employee by userId
@@ -19,12 +19,14 @@ export const applyForOvertime = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    // Calculate total hours and amount
+    // Calculate total hours
     const start = new Date(`${date}T${startTime}`);
     const end = new Date(`${date}T${endTime}`);
     const totalHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-    const rate = employee.salary / (22 * 8); // Assuming 22 working days and 8 hours per day
-    const amount = totalHours * rate * 1.5; // 1.5x for overtime
+
+    // Calculate amount (assuming rate is 1.5x normal rate)
+    const rate = 1.5; // This should come from employee's salary configuration
+    const amount = totalHours * rate;
 
     const overtime = new Overtime({
       employee: employee._id,
@@ -32,27 +34,28 @@ export const applyForOvertime = async (req: Request, res: Response) => {
       startTime: start,
       endTime: end,
       totalHours,
-      reason,
       rate,
       amount,
+      reason,
       createdBy: userId,
       updatedBy: userId,
     });
 
     await overtime.save();
 
-    // Create notification for approvers
-    const notification = new Notification({
-      recipient: userId,
-      type: 'overtime',
-      title: 'Overtime Request',
-      message: `Your overtime request for ${date} has been submitted.`,
-      data: { overtimeId: overtime._id },
-      createdBy: userId,
-      updatedBy: userId,
-    });
-
-    await notification.save();
+    // Create notification for HR
+    const hrEmployees = await Employee.find({ role: 'HR_MANAGER' });
+    for (const hr of hrEmployees) {
+      await Notification.create({
+        recipient: hr._id,
+        type: 'overtime_pending',
+        title: 'New Overtime Request',
+        message: `Employee ${employee.firstName} has requested overtime for ${date}`,
+        metadata: {
+          overtimeId: overtime._id,
+        },
+      });
+    }
 
     res.status(201).json(overtime);
   } catch (error) {
@@ -62,25 +65,29 @@ export const applyForOvertime = async (req: Request, res: Response) => {
 
 export const getOvertimeRequests = async (req: Request, res: Response) => {
   try {
-    const { employeeId, status, startDate, endDate } = req.query;
-    const userId = req.user?._id;
-
+    const { status, employeeId } = req.query;
     const query: any = {};
-    if (employeeId) query.employee = employeeId;
-    if (status) query.status = status;
-    if (startDate && endDate) {
-      query.date = {
-        $gte: new Date(startDate as string),
-        $lte: new Date(endDate as string),
-      };
+
+    if (status) {
+      query.status = status;
     }
 
-    const overtimeRequests = await Overtime.find(query)
+    if (employeeId) {
+      query.employee = employeeId;
+    } else if (req.user?.role !== 'HR_MANAGER') {
+      // If not HR manager, only show their own requests
+      const employee = await Employee.findOne({ userId: req.user?._id });
+      if (employee) {
+        query.employee = employee._id;
+      }
+    }
+
+    const requests = await Overtime.find(query)
       .populate('employee', 'firstName lastName')
       .populate('approvedBy', 'firstName lastName')
       .sort({ createdAt: -1 });
 
-    res.json(overtimeRequests);
+    res.json(requests);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching overtime requests', error });
   }
@@ -92,34 +99,33 @@ export const updateOvertimeStatus = async (req: Request, res: Response) => {
     const { status, rejectionReason } = req.body;
     const userId = req.user?._id;
 
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
     const overtime = await Overtime.findById(id);
     if (!overtime) {
       return res.status(404).json({ message: 'Overtime request not found' });
     }
 
-    if (overtime.status !== 'pending') {
-      return res.status(400).json({ message: 'Overtime request is not pending' });
-    }
-
     overtime.status = status;
     overtime.approvedBy = status === 'approved' ? userId : undefined;
+    overtime.approvedAt = status === 'approved' ? new Date() : undefined;
     overtime.rejectionReason = status === 'rejected' ? rejectionReason : undefined;
     overtime.updatedBy = userId as Types.ObjectId;
 
     await overtime.save();
 
     // Create notification for employee
-    const notification = new Notification({
+    await Notification.create({
       recipient: overtime.employee,
-      type: 'overtime',
-      title: 'Overtime Status Update',
-      message: `Your overtime request for ${overtime.date} has been ${status}.`,
-      data: { overtimeId: overtime._id },
-      createdBy: userId,
-      updatedBy: userId,
+      type: `overtime_${status}`,
+      title: `Overtime Request ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+      message: `Your overtime request for ${overtime.date} has been ${status}`,
+      metadata: {
+        overtimeId: overtime._id,
+      },
     });
-
-    await notification.save();
 
     res.json(overtime);
   } catch (error) {

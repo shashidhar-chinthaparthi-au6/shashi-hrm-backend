@@ -6,12 +6,13 @@ export interface IOvertime extends Document {
   startTime: Date;
   endTime: Date;
   totalHours: number;
+  rate: number;
+  amount: number;
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
   approvedBy?: mongoose.Types.ObjectId;
+  approvedAt?: Date;
   rejectionReason?: string;
-  rate: number;
-  amount: number;
   createdBy: mongoose.Types.ObjectId;
   updatedBy: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -25,6 +26,8 @@ const OvertimeSchema = new Schema<IOvertime>(
     startTime: { type: Date, required: true },
     endTime: { type: Date, required: true },
     totalHours: { type: Number, required: true },
+    rate: { type: Number, required: true },
+    amount: { type: Number, required: true },
     reason: { type: String, required: true },
     status: {
       type: String,
@@ -32,9 +35,8 @@ const OvertimeSchema = new Schema<IOvertime>(
       default: 'pending',
     },
     approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    approvedAt: { type: Date },
     rejectionReason: { type: String },
-    rate: { type: Number, required: true },
-    amount: { type: Number, required: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },

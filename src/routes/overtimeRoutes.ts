@@ -4,12 +4,12 @@ import {
   getOvertimeRequests,
   updateOvertimeStatus,
 } from '../controllers/overtimeController';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authenticate } from '../middleware/auth';
 
 const router = express.Router();
 
 // Apply authentication middleware to all routes
-router.use(authMiddleware);
+router.use(authenticate);
 
 // Overtime routes
 router.post('/', applyForOvertime);
