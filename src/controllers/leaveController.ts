@@ -7,11 +7,15 @@ import { Types } from 'mongoose';
 
 export const applyForLeave = async (req: Request, res: Response) => {
   try {
-    const { employeeId, leaveTypeId, startDate, endDate, reason } = req.body;
+    const { leaveTypeId, startDate, endDate, reason } = req.body;
     const userId = req.user?._id;
 
+    if (!userId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
     // Check if employee exists
-    const employee = await Employee.findById(employeeId);
+    const employee = await Employee.findOne({ userId: userId });
     if (!employee) {
       return res.status(404).json({ message: 'Employee not found' });
     }
@@ -29,14 +33,25 @@ export const applyForLeave = async (req: Request, res: Response) => {
 
     // Check leave balance
     const currentYear = new Date().getFullYear();
-    const leaveBalance = await LeaveBalance.findOne({
-      employee: employeeId,
+    let leaveBalance = await LeaveBalance.findOne({
+      employee: employee._id,
       leaveType: leaveTypeId,
       year: currentYear,
     });
 
+    // If no leave balance exists, create one with default days
     if (!leaveBalance) {
-      return res.status(400).json({ message: 'Leave balance not found for this year' });
+      leaveBalance = new LeaveBalance({
+        employee: employee._id,
+        leaveType: leaveTypeId,
+        year: currentYear,
+        totalDays: leaveType.defaultDays,
+        usedDays: 0,
+        remainingDays: leaveType.defaultDays,
+        createdBy: userId,
+        updatedBy: userId,
+      });
+      await leaveBalance.save();
     }
 
     if (leaveBalance.remainingDays < leaveDays) {
@@ -45,7 +60,7 @@ export const applyForLeave = async (req: Request, res: Response) => {
 
     // Check for overlapping leave applications
     const overlappingLeave = await LeaveApplication.findOne({
-      employee: employeeId,
+      employee: employee._id,
       $or: [
         {
           startDate: { $lte: end },
@@ -60,7 +75,7 @@ export const applyForLeave = async (req: Request, res: Response) => {
     }
 
     const leaveApplication = new LeaveApplication({
-      employee: employeeId,
+      employee: employee._id,
       leaveType: leaveTypeId,
       startDate: start,
       endDate: end,
