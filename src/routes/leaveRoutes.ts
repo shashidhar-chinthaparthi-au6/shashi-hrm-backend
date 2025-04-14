@@ -4,6 +4,8 @@ import {
   getLeaveApplications,
   updateLeaveStatus,
   getLeaveBalance,
+  getLeaveHistory,
+  getLeaveUsageTrend,
 } from '../controllers/leaveController';
 import {
   createLeaveType,
@@ -22,7 +24,11 @@ router.use(authenticate);
 router.post('/applications', applyForLeave);
 router.get('/applications', getLeaveApplications);
 router.put('/applications/:id/status', updateLeaveStatus);
-router.get('/balance', getLeaveBalance);
+
+// Leave balance and history routes
+router.get('/balances', getLeaveBalance);
+router.get('/history', getLeaveHistory);
+router.get('/trend', getLeaveUsageTrend);
 
 // Leave type routes
 router.post('/types', createLeaveType);

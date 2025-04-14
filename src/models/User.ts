@@ -7,9 +7,11 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: Role;
-  department?: string;
+  department: string;
   isActive: boolean;
   lastLogin?: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const UserSchema = new Schema<IUser>(
@@ -19,9 +21,9 @@ const UserSchema = new Schema<IUser>(
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     role: { type: String, enum: Object.values(Role), required: true },
-    department: { type: String },
+    department: { type: String, required: true },
     isActive: { type: Boolean, default: true },
-    lastLogin: { type: Date },
+    lastLogin: { type: Date }
   },
   { timestamps: true }
 );

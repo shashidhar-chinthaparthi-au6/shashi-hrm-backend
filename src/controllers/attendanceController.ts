@@ -3,6 +3,7 @@ import { Attendance } from '../models/Attendance';
 import { Employee } from '../models/Employee';
 import { LeaveApplication } from '../models/LeaveApplication';
 import { Types } from 'mongoose';
+import { format, parseISO, differenceInMinutes } from 'date-fns';
 
 export const markAttendance = async (req: Request, res: Response) => {
   try {
@@ -173,5 +174,253 @@ export const getAttendanceReport = async (req: Request, res: Response) => {
     res.json({ attendance, stats });
   } catch (error) {
     res.status(500).json({ message: 'Error generating attendance report', error });
+  }
+};
+
+export const getAttendanceByDate = async (req: Request, res: Response) => {
+  try {
+    const { date } = req.params;
+    const attendance = await Attendance.find({ date: parseISO(date) })
+      .populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by date' });
+  }
+};
+
+export const getAttendanceByEmployee = async (req: Request, res: Response) => {
+  try {
+    const { employeeId } = req.params;
+    const attendance = await Attendance.find({ employee: employeeId })
+      .populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by employee' });
+  }
+};
+
+export const getAttendanceByDepartment = async (req: Request, res: Response) => {
+  try {
+    const { department } = req.params;
+    const employees = await Employee.find({ department });
+    const employeeIds = employees.map(emp => emp._id);
+    const attendance = await Attendance.find({ employee: { $in: employeeIds } })
+      .populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by department' });
+  }
+};
+
+export const getAttendanceByStatus = async (req: Request, res: Response) => {
+  try {
+    const { status } = req.params;
+    const attendance = await Attendance.find({ status })
+      .populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by status' });
+  }
+};
+
+export const getAttendanceByDateRange = async (req: Request, res: Response) => {
+  try {
+    const { startDate, endDate } = req.params;
+    const attendance = await Attendance.find({
+      date: {
+        $gte: parseISO(startDate),
+        $lte: parseISO(endDate)
+      }
+    }).populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by date range' });
+  }
+};
+
+export const getAttendanceByEmployeeAndDateRange = async (req: Request, res: Response) => {
+  try {
+    const { employeeId, startDate, endDate } = req.params;
+    const attendance = await Attendance.find({
+      employee: employeeId,
+      date: {
+        $gte: parseISO(startDate),
+        $lte: parseISO(endDate)
+      }
+    }).populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by employee and date range' });
+  }
+};
+
+export const getAttendanceByDepartmentAndDateRange = async (req: Request, res: Response) => {
+  try {
+    const { department, startDate, endDate } = req.params;
+    const employees = await Employee.find({ department });
+    const employeeIds = employees.map(emp => emp._id);
+    const attendance = await Attendance.find({
+      employee: { $in: employeeIds },
+      date: {
+        $gte: parseISO(startDate),
+        $lte: parseISO(endDate)
+      }
+    }).populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by department and date range' });
+  }
+};
+
+export const getAttendanceByStatusAndDateRange = async (req: Request, res: Response) => {
+  try {
+    const { status, startDate, endDate } = req.params;
+    const attendance = await Attendance.find({
+      status,
+      date: {
+        $gte: parseISO(startDate),
+        $lte: parseISO(endDate)
+      }
+    }).populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by status and date range' });
+  }
+};
+
+export const getAttendanceByEmployeeAndStatus = async (req: Request, res: Response) => {
+  try {
+    const { employeeId, status } = req.params;
+    const attendance = await Attendance.find({
+      employee: employeeId,
+      status
+    }).populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by employee and status' });
+  }
+};
+
+export const getAttendanceByDepartmentAndStatus = async (req: Request, res: Response) => {
+  try {
+    const { department, status } = req.params;
+    const employees = await Employee.find({ department });
+    const employeeIds = employees.map(emp => emp._id);
+    const attendance = await Attendance.find({
+      employee: { $in: employeeIds },
+      status
+    }).populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by department and status' });
+  }
+};
+
+export const getAttendanceByEmployeeAndDepartment = async (req: Request, res: Response) => {
+  try {
+    const { employeeId, department } = req.params;
+    const employee = await Employee.findOne({ _id: employeeId, department });
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee not found in specified department' });
+    }
+    const attendance = await Attendance.find({ employee: employeeId })
+      .populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by employee and department' });
+  }
+};
+
+export const getAttendanceByEmployeeAndStatusAndDateRange = async (req: Request, res: Response) => {
+  try {
+    const { employeeId, status, startDate, endDate } = req.params;
+    const attendance = await Attendance.find({
+      employee: employeeId,
+      status,
+      date: {
+        $gte: parseISO(startDate),
+        $lte: parseISO(endDate)
+      }
+    }).populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by employee, status and date range' });
+  }
+};
+
+export const getAttendanceByDepartmentAndStatusAndDateRange = async (req: Request, res: Response) => {
+  try {
+    const { department, status, startDate, endDate } = req.params;
+    const employees = await Employee.find({ department });
+    const employeeIds = employees.map(emp => emp._id);
+    const attendance = await Attendance.find({
+      employee: { $in: employeeIds },
+      status,
+      date: {
+        $gte: parseISO(startDate),
+        $lte: parseISO(endDate)
+      }
+    }).populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by department, status and date range' });
+  }
+};
+
+export const getAttendanceByEmployeeAndDepartmentAndDateRange = async (req: Request, res: Response) => {
+  try {
+    const { employeeId, department, startDate, endDate } = req.params;
+    const employee = await Employee.findOne({ _id: employeeId, department });
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee not found in specified department' });
+    }
+    const attendance = await Attendance.find({
+      employee: employeeId,
+      date: {
+        $gte: parseISO(startDate),
+        $lte: parseISO(endDate)
+      }
+    }).populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by employee, department and date range' });
+  }
+};
+
+export const getAttendanceByEmployeeAndDepartmentAndStatus = async (req: Request, res: Response) => {
+  try {
+    const { employeeId, department, status } = req.params;
+    const employee = await Employee.findOne({ _id: employeeId, department });
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee not found in specified department' });
+    }
+    const attendance = await Attendance.find({
+      employee: employeeId,
+      status
+    }).populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by employee, department and status' });
+  }
+};
+
+export const getAttendanceByEmployeeAndDepartmentAndStatusAndDateRange = async (req: Request, res: Response) => {
+  try {
+    const { employeeId, department, status, startDate, endDate } = req.params;
+    const employee = await Employee.findOne({ _id: employeeId, department });
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee not found in specified department' });
+    }
+    const attendance = await Attendance.find({
+      employee: employeeId,
+      status,
+      date: {
+        $gte: parseISO(startDate),
+        $lte: parseISO(endDate)
+      }
+    }).populate('employee', 'name employeeId department');
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance by employee, department, status and date range' });
   }
 }; 

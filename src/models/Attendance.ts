@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { IShift } from './Shift';
 
 export interface IAttendance extends Document {
   employee: mongoose.Types.ObjectId;
@@ -8,6 +9,7 @@ export interface IAttendance extends Document {
   status: 'present' | 'absent' | 'late' | 'half_day' | 'on_leave';
   totalHours?: number;
   notes?: string;
+  shift?: IShift;
   createdBy: mongoose.Types.ObjectId;
   updatedBy: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -27,6 +29,7 @@ const AttendanceSchema = new Schema<IAttendance>(
     },
     totalHours: { type: Number },
     notes: { type: String },
+    shift: { type: Schema.Types.ObjectId, ref: 'Shift' },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },

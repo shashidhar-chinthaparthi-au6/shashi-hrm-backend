@@ -1,9 +1,25 @@
 import { Request, Response } from 'express';
-import { LeaveApplication } from '../models/LeaveApplication';
+import { LeaveApplication, ILeaveApplication } from '../models/LeaveApplication';
 import { LeaveBalance } from '../models/LeaveBalance';
 import { LeaveType } from '../models/LeaveType';
 import { Employee } from '../models/Employee';
 import { Types } from 'mongoose';
+
+interface PopulatedLeaveType {
+  _id: Types.ObjectId;
+  name: string;
+}
+
+interface PopulatedUser {
+  _id: Types.ObjectId;
+  firstName: string;
+  lastName: string;
+}
+
+interface PopulatedLeaveApplication extends Omit<ILeaveApplication, 'leaveType' | 'approvedBy'> {
+  leaveType: PopulatedLeaveType;
+  approvedBy?: PopulatedUser;
+}
 
 export const applyForLeave = async (req: Request, res: Response) => {
   try {
@@ -180,5 +196,130 @@ export const getLeaveBalance = async (req: Request, res: Response) => {
     res.json(leaveBalances);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching leave balance', error });
+  }
+};
+
+export const getLeaveHistory = async (req: Request, res: Response) => {
+  try {
+    const { employeeId, year, leaveTypeId } = req.query;
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    // Find employee
+    const employee = await Employee.findOne(
+      employeeId ? { _id: employeeId } : { userId }
+    );
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+
+    // Build query
+    const query: any = { employee: employee._id };
+    if (year) {
+      const startDate = new Date(Number(year), 0, 1);
+      const endDate = new Date(Number(year), 11, 31);
+      query.startDate = { $gte: startDate };
+      query.endDate = { $lte: endDate };
+    }
+    if (leaveTypeId) {
+      query.leaveType = leaveTypeId;
+    }
+
+    // Get leave history
+    const leaveHistory = await LeaveApplication.find(query)
+      .populate('leaveType', 'name')
+      .populate('approvedBy', 'firstName lastName')
+      .sort({ startDate: -1 }) as unknown as PopulatedLeaveApplication[];
+
+    // Format response
+    const formattedHistory = leaveHistory.map(leave => ({
+      id: leave._id,
+      leaveType: leave.leaveType.name,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      status: leave.status,
+      reason: leave.reason,
+      approvedBy: leave.approvedBy ? `${leave.approvedBy.firstName} ${leave.approvedBy.lastName}` : null,
+      rejectionReason: leave.rejectionReason,
+      createdAt: leave.createdAt,
+      updatedAt: leave.updatedAt,
+    }));
+
+    res.json(formattedHistory);
+  } catch (error) {
+    console.error('Error fetching leave history:', error);
+    res.status(500).json({ message: 'Error fetching leave history' });
+  }
+};
+
+export const getLeaveUsageTrend = async (req: Request, res: Response) => {
+  try {
+    const { employeeId, year, leaveTypeId } = req.query;
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    // Find employee
+    const employee = await Employee.findOne(
+      employeeId ? { _id: employeeId } : { userId }
+    );
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+
+    // Build query
+    const query: any = { employee: employee._id, status: 'approved' };
+    if (year) {
+      const startDate = new Date(Number(year), 0, 1);
+      const endDate = new Date(Number(year), 11, 31);
+      query.startDate = { $gte: startDate };
+      query.endDate = { $lte: endDate };
+    }
+    if (leaveTypeId) {
+      query.leaveType = leaveTypeId;
+    }
+
+    // Get approved leaves
+    const approvedLeaves = await LeaveApplication.find(query)
+      .populate('leaveType', 'name')
+      .sort({ startDate: 1 }) as unknown as PopulatedLeaveApplication[];
+
+    // Calculate monthly trends
+    const monthlyTrends: { [key: string]: number } = {};
+    const leaveTypeTrends: { [key: string]: number } = {};
+
+    approvedLeaves.forEach(leave => {
+      // Monthly trend
+      const month = leave.startDate.toISOString().substring(0, 7); // YYYY-MM
+      const days = Math.ceil((leave.endDate.getTime() - leave.startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      monthlyTrends[month] = (monthlyTrends[month] || 0) + days;
+
+      // Leave type trend
+      const leaveTypeName = leave.leaveType.name;
+      leaveTypeTrends[leaveTypeName] = (leaveTypeTrends[leaveTypeName] || 0) + days;
+    });
+
+    // Format response
+    const response = {
+      monthlyTrends: Object.entries(monthlyTrends).map(([month, days]) => ({
+        month,
+        days,
+      })),
+      leaveTypeTrends: Object.entries(leaveTypeTrends).map(([leaveType, days]) => ({
+        leaveType,
+        days,
+      })),
+      totalDays: Object.values(monthlyTrends).reduce((sum, days) => sum + days, 0),
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error fetching leave usage trend:', error);
+    res.status(500).json({ message: 'Error fetching leave usage trend' });
   }
 }; 
