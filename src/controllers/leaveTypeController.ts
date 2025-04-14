@@ -5,7 +5,9 @@ import { Types } from 'mongoose';
 
 export const createLeaveType = async (req: Request, res: Response) => {
   try {
+    console.log('req.body', req.body);
     const { name, description, defaultDays, isPaid } = req.body;
+    console.log('user', req.user);
     const userId = req.user?._id;
 
     const leaveType = new LeaveType({
