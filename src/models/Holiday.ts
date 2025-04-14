@@ -18,15 +18,13 @@ const holidaySchema = new mongoose.Schema({
     type: String,
     required: false,
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+}, { timestamps: true });
+
+// Add indexes for better query performance
+holidaySchema.index({ date: 1 });
+holidaySchema.index({ type: 1 });
 
 // Update the updatedAt field before saving
 holidaySchema.pre('save', function (next) {
