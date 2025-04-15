@@ -26,19 +26,30 @@ export const applyForLeave = async (req: Request, res: Response) => {
     const { leaveTypeId, startDate, endDate, reason } = req.body;
     const userId = req.user?._id;
 
+    console.log('Received leave application request:', {
+      leaveTypeId,
+      startDate,
+      endDate,
+      reason,
+      userId,
+    });
+
     if (!userId) {
+      console.log('No user ID found in request');
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
     // Check if employee exists
     const employee = await Employee.findOne({ userId: userId });
     if (!employee) {
+      console.log('Employee not found for user:', userId);
       return res.status(404).json({ message: 'Employee not found' });
     }
 
     // Check if leave type exists
     const leaveType = await LeaveType.findById(leaveTypeId);
     if (!leaveType) {
+      console.log('Leave type not found:', leaveTypeId);
       return res.status(404).json({ message: 'Leave type not found' });
     }
 
@@ -46,6 +57,8 @@ export const applyForLeave = async (req: Request, res: Response) => {
     const start = new Date(startDate);
     const end = new Date(endDate);
     const leaveDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    console.log('Calculated leave days:', leaveDays);
 
     // Check leave balance
     const currentYear = new Date().getFullYear();
@@ -55,8 +68,11 @@ export const applyForLeave = async (req: Request, res: Response) => {
       year: currentYear,
     });
 
+    console.log('Found leave balance:', leaveBalance);
+
     // If no leave balance exists, create one with default days
     if (!leaveBalance) {
+      console.log('Creating new leave balance');
       leaveBalance = new LeaveBalance({
         employee: employee._id,
         leaveType: leaveTypeId,
@@ -71,7 +87,17 @@ export const applyForLeave = async (req: Request, res: Response) => {
     }
 
     if (leaveBalance.remainingDays < leaveDays) {
-      return res.status(400).json({ message: 'Insufficient leave balance' });
+      console.log('Insufficient leave balance:', {
+        remaining: leaveBalance.remainingDays,
+        requested: leaveDays,
+      });
+      return res.status(400).json({ 
+        message: 'Insufficient leave balance',
+        details: {
+          remainingDays: leaveBalance.remainingDays,
+          requestedDays: leaveDays
+        }
+      });
     }
 
     // Check for overlapping leave applications
@@ -87,7 +113,14 @@ export const applyForLeave = async (req: Request, res: Response) => {
     });
 
     if (overlappingLeave) {
-      return res.status(400).json({ message: 'Overlapping leave application exists' });
+      console.log('Found overlapping leave application:', overlappingLeave);
+      return res.status(400).json({ 
+        message: 'Overlapping leave application exists',
+        details: {
+          existingStartDate: overlappingLeave.startDate,
+          existingEndDate: overlappingLeave.endDate
+        }
+      });
     }
 
     const leaveApplication = new LeaveApplication({
@@ -101,9 +134,14 @@ export const applyForLeave = async (req: Request, res: Response) => {
     });
 
     await leaveApplication.save();
+    console.log('Successfully created leave application:', leaveApplication);
     res.status(201).json(leaveApplication);
   } catch (error) {
-    res.status(500).json({ message: 'Error applying for leave', error });
+    console.error('Error in applyForLeave:', error);
+    res.status(500).json({ 
+      message: 'Error applying for leave',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 };
 
@@ -185,9 +223,29 @@ export const getLeaveBalance = async (req: Request, res: Response) => {
   try {
     const { employeeId, year } = req.query;
     const currentYear = year || new Date().getFullYear();
+    const userRole = req.user?.role as string;
 
     const query: any = { year: currentYear };
-    if (employeeId) query.employee = employeeId;
+    
+    // For admin users, if no specific employee is selected, return all balances
+    if (!employeeId && ['SUPER_ADMIN', 'ADMIN', 'HR_MANAGER'].includes(userRole)) {
+      const leaveBalances = await LeaveBalance.find(query)
+        .populate('employee', 'firstName lastName')
+        .populate('leaveType', 'name defaultDays isPaid');
+      return res.json(leaveBalances);
+    }
+
+    // For specific employee or non-admin users
+    if (employeeId) {
+      query.employee = employeeId;
+    } else {
+      // For non-admin users, only return their own balance
+      const employee = await Employee.findOne({ userId: req.user?._id });
+      if (!employee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+      query.employee = employee._id;
+    }
 
     const leaveBalances = await LeaveBalance.find(query)
       .populate('employee', 'firstName lastName')

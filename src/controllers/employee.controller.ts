@@ -13,6 +13,15 @@ export class EmployeeController {
       const userRole = req.user?.role as Role;
       const permissions = rolePermissions[userRole];
 
+      // Allow access for admin roles
+      if (['SUPER_ADMIN', 'ADMIN', 'HR_MANAGER'].includes(userRole)) {
+        const employees = await Employee.find()
+          .select('-__v')
+          .populate('createdBy', 'firstName lastName email')
+          .populate('updatedBy', 'firstName lastName email');
+        return res.json(employees);
+      }
+
       if (!permissions?.employees?.read) {
         return res.status(403).json({ message: 'Access denied' });
       }
