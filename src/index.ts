@@ -7,7 +7,7 @@ import { logger } from './utils/logger';
 // Import routes
 import authRoutes from './routes/auth.routes';
 import employeeRoutes from './routes/employee.routes';
-import attendanceRoutes from './routes/attendanceRoutes';
+import attendanceRoutes from './routes/attendance.routes';
 import leaveRoutes from './routes/leaveRoutes';
 
 // Load environment variables

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { User } from '../models/User';
 import { Role } from '../types/roles';
+import { AuthService } from '../services/auth.service';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
@@ -63,6 +64,7 @@ export const login = async (req: Request, res: Response) => {
 export const register = async (req: Request, res: Response) => {
   try {
     const { firstName, lastName, email, password, role, department } = req.body;
+    const creatorRole = req.user?.role as Role;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -70,26 +72,35 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Create new user with role validation
+    const result = await AuthService.register(
+      {
+        firstName,
+        lastName,
+        email,
+        password,
+        role: role || Role.EMPLOYEE,
+        department,
+      },
+      creatorRole
+    );
 
-    // Create new user
-    const user = new User({
-      firstName,
-      lastName,
-      email,
-      password: hashedPassword,
-      role: role || Role.EMPLOYEE,
-      department,
-      isActive: true
+    res.status(201).json({
+      message: 'User registered successfully',
+      user: {
+        id: result.user._id,
+        firstName: result.user.firstName,
+        lastName: result.user.lastName,
+        email: result.user.email,
+        role: result.user.role,
+        department: result.user.department
+      }
     });
-
-    await user.save();
-
-    res.status(201).json({ message: 'User registered successfully' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Registration error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(error.status || 500).json({ 
+      message: error.message || 'Internal server error' 
+    });
   }
 };
 

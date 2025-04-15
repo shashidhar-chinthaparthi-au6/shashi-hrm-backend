@@ -28,7 +28,8 @@ async function createSuperAdmin() {
       lastName: 'Admin',
       email: 'superadmin@example.com',
       password: 'Admin@123',
-      role: Role.SUPER_ADMIN
+      role: Role.SUPER_ADMIN,
+      department: 'Administration'
     };
 
     const result = await AuthService.register(superAdminData);

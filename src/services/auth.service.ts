@@ -6,14 +6,39 @@ import { Role } from '../types/roles';
 import { BadRequestError, UnauthorizedError } from '../utils/errors';
 
 export class AuthService {
-  static async register(userData: Partial<IUser>): Promise<{ user: IUser; token: string }> {
+  static async register(userData: Partial<IUser>, creatorRole?: Role): Promise<{ user: IUser; token: string }> {
     try {
-      const { email, password, firstName, lastName, role = Role.EMPLOYEE } = userData;
+      const { email, password, firstName, lastName, role = Role.EMPLOYEE, department } = userData;
 
       // Check if user already exists
       const existingUser = await User.findOne({ email });
       if (existingUser) {
-        throw new Error('Email already registered');
+        throw new BadRequestError('Email already registered');
+      }
+
+      // Validate role assignment based on creator's role
+      if (creatorRole) {
+        switch (creatorRole) {
+          case Role.HR_MANAGER:
+            if (role !== Role.EMPLOYEE) {
+              throw new UnauthorizedError('HR Manager can only create Employee accounts');
+            }
+            break;
+          case Role.ADMIN:
+            if (role === Role.SUPER_ADMIN) {
+              throw new UnauthorizedError('Admin cannot create Super Admin accounts');
+            }
+            break;
+          case Role.DEPARTMENT_MANAGER:
+            throw new UnauthorizedError('Department Manager cannot create user accounts');
+          case Role.EMPLOYEE:
+            throw new UnauthorizedError('Employees cannot create user accounts');
+        }
+      } else {
+        // If no creator role is provided, only allow EMPLOYEE role
+        if (role !== Role.EMPLOYEE) {
+          throw new UnauthorizedError('Only authorized users can create non-employee accounts');
+        }
       }
 
       // Hash password
@@ -27,6 +52,7 @@ export class AuthService {
         firstName,
         lastName,
         role,
+        department,
       });
 
       await user.save();

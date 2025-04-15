@@ -2,12 +2,13 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import attendanceRoutes from './routes/attendanceRoutes';
+import attendanceRoutes from './routes/attendance.routes';
 import leaveRoutes from './routes/leaveRoutes';
 import holidayRoutes from './routes/holidayRoutes';
 import shiftRoutes from './routes/shiftRoutes';
 import overtimeRoutes from './routes/overtimeRoutes';
 import authRoutes from './routes/authRoutes';
+import employeeRoutes from './routes/employee.routes';
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ mongoose
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/employees', employeeRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/leave', leaveRoutes);
 app.use('/api/holidays', holidayRoutes);
@@ -40,4 +42,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-}); 
+});
+
+export default app; 
