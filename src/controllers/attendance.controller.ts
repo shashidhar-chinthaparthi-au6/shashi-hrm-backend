@@ -44,15 +44,11 @@ export const attendanceController = {
       const { id } = req.params;
       const { checkIn, checkOut, status, notes } = req.body;
 
-      // Format time strings if provided
-      const formattedCheckIn = checkIn ? format(new Date(checkIn), 'HH:mm') : undefined;
-      const formattedCheckOut = checkOut ? format(new Date(checkOut), 'HH:mm') : undefined;
-
       const record = await attendanceService.updateAttendanceRecord(id, {
-        ...(formattedCheckIn && { checkIn: formattedCheckIn }),
-        ...(formattedCheckOut && { checkOut: formattedCheckOut }),
-        ...(status && { status }),
-        ...(notes && { notes })
+        checkIn,
+        checkOut,
+        status,
+        notes
       });
 
       res.json(record);
@@ -98,6 +94,23 @@ export const attendanceController = {
 
       await workbook.xlsx.write(res);
       res.end();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
+  async markAttendance(req: Request, res: Response) {
+    try {
+      const { employeeId, date, checkIn, checkOut, status, notes } = req.body;
+      const record = await attendanceService.markAttendance({
+        employeeId,
+        date: new Date(date),
+        checkIn,
+        checkOut,
+        status,
+        notes
+      });
+      res.json(record);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -7,6 +7,9 @@ const router = express.Router();
 // Apply authentication middleware to all routes
 router.use(authenticate);
 
+// Mark attendance
+router.post('/', attendanceController.markAttendance);
+
 // Get daily attendance
 router.get('/daily/:date', attendanceController.getDailyAttendance);
 
